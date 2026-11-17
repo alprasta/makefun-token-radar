@@ -28,11 +28,14 @@
   <h2>How the value is computed — model radar-2</h2>
   <p class="formula">implied value = TVL &times; category multiple &times; growth &times; maturity &times; chains</p>
   <ul>
-    <li><b>Category multiple.</b> The median market-cap / TVL of the live-token protocols in the <i>same category</i> in this same snapshot — the market's own price for that kind of protocol. A category needs at least 5 live comparables to price its own rows; otherwise the row is priced at the overall live-token median. The multiple is clamped to 0.05–0.60.</li>
+    <li><b>Category multiple.</b> The market's own price for this kind of protocol, from the live-token protocols in the <i>same category</i> in this same snapshot. It is a shrinkage estimate, not a cutoff: a category with n live comparables is priced at (n / 5) &times; its own median market-cap / TVL + (1 &minus; n / 5) &times; the overall live-token median, with n capped at 5. A category with 5 or more comparables is priced by its own median alone; a category with 1 to 4 keeps a real share of its own price instead of being thrown away; a category with none is priced at the market average, never at a guess. The multiple is clamped to 0.05–0.60. In this snapshot 26 of the board's 34 categories hold 1 to 4 live comparables — under the old 5-or-nothing rule they were all priced at one flat number, including the whole top of the board.</li>
     <li><b>Growth.</b> 1 + (7-day TVL change, clamped to −60%…+120%) / 100 &times; 0.5. No 7-day figure counts as 0%.</li>
     <li><b>Maturity.</b> 0.6 + min(age in days, 1095) / 1095 &times; 0.4. Age is the time from first listing to the snapshot date; an unknown listing date counts as 365 days. A protocol that has run longer with no token scores higher.</li>
     <li><b>Chains.</b> 1 + 0.10 &times; (1 − 1 / chains). One chain scores 1.00; many chains approach 1.10.</li>
+    <li><b>Farm plans.</b> Every step of a protocol's six-step plan is derived from its own record, never copied from a template: the wallet step names its first chain and that chain's gas token, the weekly step is the recurring action of its own category (collect fees on a DEX, roll the hedge on a perpetual, restake rewards on a staking protocol), the hold step names its age and size, the claim step names where its kind of protocol pays out, and the log step names what its kind of position has to track.</li>
   </ul>
+  <p class="note" id="method-stats"></p>
+  <div id="cat-table"></div>
   <p class="note">One function scores every row from the snapshot's own figures — no protocol name is special-cased and no row is hand-picked. “Records no token” means DefiLlama's record carries no market cap, no CoinGecko id and no symbol; it is the record, not proof a token does not exist. Protocols whose token already trades are set aside in the Live view with their market caps, never mixed into the ranked board. Implied value is this entry's own estimate, not a price and not a prediction that a token will launch.</p>
 </section>
 

@@ -137,6 +137,59 @@
       'Source: ' + DATA.source + '. Snapshot ' + DATA.as_of + '. Implied values are this entry\u2019s model estimates, not prices.';
   }
 
+  // The method section's numbers, filled from the same data the board renders:
+  // one row per category with its multiple, its live comparables and the weight
+  // they carry, plus the snapshot-level figures. This is the model's whole
+  // pricing table, in the open, so a reader can check any row's multiple.
+  function fillMethod() {
+    var stats = document.getElementById('method-stats');
+    var holder = document.getElementById('cat-table');
+    var byCat = {};
+    DATA.rows.forEach(function (r) {
+      var c = r.category || 'Other';
+      if (!byCat[c]) byCat[c] = r;
+    });
+    var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b].category_multiple - byCat[a].category_multiple; });
+    var outright = 0, shrunk = 0, flat = 0;
+    cats.forEach(function (c) {
+      var w = byCat[c].category_weight;
+      if (w >= 1) outright++;
+      else if (w > 0) shrunk++;
+      else flat++;
+    });
+    if (stats) {
+      stats.textContent = 'In this snapshot ' + DATA.live_comps + ' live-token protocols price the board: the overall live median is x' + DATA.overall_multiple + '; ' + outright + ' categor' + (outright === 1 ? 'y is' : 'ies are') + ' priced by their own median outright, ' + shrunk + ' by a shrinkage blend, and ' + flat + ' at the overall median for want of any live comparable.';
+    }
+    if (!holder) return;
+    var tbody = el('tbody');
+    cats.forEach(function (c) {
+      var r = byCat[c];
+      var rows = DATA.rows.filter(function (x) { return (x.category || 'Other') === c; }).length;
+      tbody.appendChild(el('tr', null,
+        el('td', { text: c }),
+        el('td', { class: 'num', text: fmtMult(r.category_multiple) }),
+        el('td', { class: 'num', text: String(r.category_comps) }),
+        el('td', { class: 'num', text: r.category_weight.toFixed(2) }),
+        el('td', { class: 'num', text: String(rows) })
+      ));
+    });
+    holder.appendChild(el('div', { class: 'panel' },
+      el('div', { class: 'table-wrap' },
+        el('table', null,
+          el('caption', { text: 'Every category\u2019s multiple, its live comparables and the weight they carry. Weight 1.00 means the category median prices its rows outright; lower means the overall live median carries the rest.' }),
+          el('thead', null, el('tr', null,
+            el('th', { scope: 'col', text: 'Category' }),
+            el('th', { scope: 'col', text: 'Multiple' }),
+            el('th', { scope: 'col', text: 'Live comparables' }),
+            el('th', { scope: 'col', text: 'Weight' }),
+            el('th', { scope: 'col', text: 'Board rows' })
+          )),
+          tbody
+        )
+      )
+    ));
+  }
+
   function controls() {
     var categories = Array.from(new Set(DATA.rows.map(function (r) { return r.category || 'Other'; }))).sort();
     var chains = Array.from(new Set(DATA.rows.reduce(function (acc, r) { return acc.concat(r.chains || []); }, []))).sort();
@@ -292,9 +345,11 @@
       ));
     }
     var recomputed = impliedOf(row);
-    var catNote = row.category_comps > 0
-      ? 'Category multiple is the median market-cap / TVL of ' + row.category_comps + ' live ' + (row.category || 'Other') + ' comparables in this snapshot.'
-      : 'Too few live ' + (row.category || 'Other') + ' comparables in this snapshot, so this row is priced at the overall live median (' + DATA.live_comps + ' live protocols).';
+    var catNote = row.category_weight >= 1
+      ? 'Category multiple is the median market-cap / TVL of ' + row.category_comps + ' live ' + (row.category || 'Other') + ' comparables in this snapshot — the category prices its own rows outright.'
+      : row.category_comps > 0
+        ? 'Category multiple is a shrinkage blend: ' + row.category_comps + ' live ' + (row.category || 'Other') + ' comparable' + (row.category_comps > 1 ? 's' : '') + ' carry weight ' + row.category_weight.toFixed(2) + ' and the rest of the weight goes to the overall live median of ' + DATA.live_comps + ' live protocols — a thin category keeps its own price instead of being priced flat.'
+        : 'No live ' + (row.category || 'Other') + ' comparable exists in this snapshot, so this row is priced at the overall live median (' + DATA.live_comps + ' live protocols).';
     var steps = (row.farm_steps || []).map(function (s) {
       var at = s.indexOf(' Cost: ');
       var action = at >= 0 ? s.slice(0, at) : s;
@@ -319,6 +374,7 @@
           el('div', { class: 'equation' },
             el('div', null, el('span', { text: 'TVL' }), el('b', { text: fmtUsd(row.tvl_usd) })),
             el('div', null, el('span', { text: 'Category multiple' }), el('b', { text: fmtMult(row.category_multiple) })),
+            el('div', null, el('span', { text: 'Category weight (' + row.category_comps + ' live comparables)' }), el('b', { text: row.category_weight.toFixed(2) })),
             el('div', null, el('span', { text: 'Growth (' + fmtPct(row.change_7d) + ' over 7d)' }), el('b', { text: fmtMult(row.growth_multiplier) })),
             el('div', null, el('span', { text: 'Maturity (' + fmtAge(row.age_days) + ' with no token)' }), el('b', { text: fmtMult(row.maturity_multiplier) })),
             el('div', null, el('span', { text: 'Chains (' + (row.chains ? row.chains.length : 1) + ' chain' + ((row.chains && row.chains.length > 1) ? 's' : '') + ')' }), el('b', { text: fmtMult(row.chain_multiplier) })),
@@ -352,6 +408,7 @@
   }
 
   headerFacts();
+  fillMethod();
   readHash();
   render();
 })();
