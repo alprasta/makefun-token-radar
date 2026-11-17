@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar — pre-token protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+<header class="top">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span class="brand-name">TOKEN RADAR</span></div>
+  <div class="top-meta"><span id="snap-date">Snapshot —</span><span>DefiLlama protocol index</span><span id="model-tag">radar-2 model</span></div>
+</header>
+
+<section class="lede">
+  <div>
+    <h1>Which pre-token protocol is worth farming next?</h1>
+    <p class="lede-sub">Every protocol below records no token, ranked by what its launch would be worth if its record stayed as it is. The watchlist is the floor, never the ceiling: the board also carries the early pre-token protocols below the $50M floor.</p>
+    <p class="top-pick" id="top-pick"></p>
+  </div>
+  <div class="facts" id="facts"></div>
+</section>
+
+<main id="app" aria-busy="true"></main>
+
+<section class="panel method" id="method">
+  <h2>How the value is computed — model radar-2</h2>
+  <p class="formula">implied value = TVL &times; category multiple &times; growth &times; maturity &times; chains</p>
+  <ul>
+    <li><b>Category multiple.</b> The median market-cap / TVL of the live-token protocols in the <i>same category</i> in this same snapshot — the market's own price for that kind of protocol. A category needs at least 5 live comparables to price its own rows; otherwise the row is priced at the overall live-token median. The multiple is clamped to 0.05–0.60.</li>
+    <li><b>Growth.</b> 1 + (7-day TVL change, clamped to −60%…+120%) / 100 &times; 0.5. No 7-day figure counts as 0%.</li>
+    <li><b>Maturity.</b> 0.6 + min(age in days, 1095) / 1095 &times; 0.4. Age is the time from first listing to the snapshot date; an unknown listing date counts as 365 days. A protocol that has run longer with no token scores higher.</li>
+    <li><b>Chains.</b> 1 + 0.10 &times; (1 − 1 / chains). One chain scores 1.00; many chains approach 1.10.</li>
+  </ul>
+  <p class="note">One function scores every row from the snapshot's own figures — no protocol name is special-cased and no row is hand-picked. “Records no token” means DefiLlama's record carries no market cap, no CoinGecko id and no symbol; it is the record, not proof a token does not exist. Protocols whose token already trades are set aside in the Live view with their market caps, never mixed into the ranked board. Implied value is this entry's own estimate, not a price and not a prediction that a token will launch.</p>
+</section>
+
+<footer class="foot"><span id="foot-line"></span></footer>
+</div>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
