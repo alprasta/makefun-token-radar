@@ -190,6 +190,47 @@
     ));
   }
 
+  // The checks section: the build-time checks from data.js, plus the same
+  // recompute run live in the browser over every row, so the page proves its
+  // own arithmetic instead of asking to be trusted.
+  function fillChecks() {
+    var line = document.getElementById('checks-line');
+    var holder = document.getElementById('checks-table');
+    var checks = DATA.checks;
+    if (!checks || !line) return;
+    var liveExact = 0;
+    DATA.rows.forEach(function (r) { if (impliedOf(r) === r.implied_value_usd) liveExact++; });
+    line.textContent = 'Recomputed at build time: ' + checks.recompute_exact + ' of ' + checks.recompute_total +
+      ' rows match board.json exactly — and this page just recomputed them live: ' + liveExact + ' of ' + DATA.rows.length +
+      ' match. Worst of the four wobble rebuilds: ' + checks.worst_top20_overlap + ' of the top 20 survive, rank correlation ' + checks.worst_rank_spearman.toFixed(4) + '.';
+    if (!holder) return;
+    var tbody = el('tbody');
+    checks.perturbations.forEach(function (p) {
+      tbody.appendChild(el('tr', null,
+        el('td', { text: 'TVL x' + p.tvl_factor.toFixed(1) + ', 7d ' + (p.growth_shift_pp > 0 ? '+' : '') + p.growth_shift_pp + 'pp' }),
+        el('td', { class: 'num', text: p.top20_overlap + ' / 20' }),
+        el('td', { class: 'num', text: p.top10_overlap + ' / 10' }),
+        el('td', { class: 'num', text: p.rank_spearman.toFixed(4) }),
+        el('td', { text: p.top1_same ? 'same top row' : 'top row changed' })
+      ));
+    });
+    holder.appendChild(el('div', { class: 'panel' },
+      el('div', { class: 'table-wrap' },
+        el('table', null,
+          el('caption', { text: 'The board rebuilt with every protocol\u2019s TVL and 7-day change moved at once. Overlap counts the top rows the rebuild kept.' }),
+          el('thead', null, el('tr', null,
+            el('th', { scope: 'col', text: 'Wobble applied' }),
+            el('th', { scope: 'col', text: 'Top 20 kept' }),
+            el('th', { scope: 'col', text: 'Top 10 kept' }),
+            el('th', { scope: 'col', text: 'Rank correlation' }),
+            el('th', { scope: 'col', text: 'Top row' })
+          )),
+          tbody
+        )
+      )
+    ));
+  }
+
   function controls() {
     var categories = Array.from(new Set(DATA.rows.map(function (r) { return r.category || 'Other'; }))).sort();
     var chains = Array.from(new Set(DATA.rows.reduce(function (acc, r) { return acc.concat(r.chains || []); }, []))).sort();
@@ -409,6 +450,7 @@
 
   headerFacts();
   fillMethod();
+  fillChecks();
   readHash();
   render();
 })();

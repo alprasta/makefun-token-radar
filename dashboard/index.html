@@ -39,6 +39,18 @@
   <p class="note">One function scores every row from the snapshot's own figures — no protocol name is special-cased and no row is hand-picked. “Records no token” means DefiLlama's record carries no market cap, no CoinGecko id and no symbol; it is the record, not proof a token does not exist. Protocols whose token already trades are set aside in the Live view with their market caps, never mixed into the ranked board. Implied value is this entry's own estimate, not a price and not a prediction that a token will launch.</p>
 </section>
 
+<section class="panel method" id="checks">
+  <h2>Checks — the board proves its own arithmetic</h2>
+  <p>Two checks run on the snapshot's own figures at build time, and the first runs again live in your browser below. They are robustness checks, not accuracy claims: the snapshot is one frozen point in time, so no backtest against later market caps can be run from it, and none is claimed here.</p>
+  <ul>
+    <li><b>Every row recomputed.</b> Each row's implied value is recomputed from the multipliers the row stores — the same arithmetic the detail view shows — and must match board.json exactly.</li>
+    <li><b>Order under wobble.</b> The board is rebuilt four times with every protocol's TVL moved 10% up or down and its 7-day change moved 5 points either way. A board whose top flips on small moves in one figure is not a ranking; a board that keeps its top rows through the wobble is one.</li>
+  </ul>
+  <p class="note" id="checks-line"></p>
+  <div id="checks-table"></div>
+  <p class="note">The checks run from the same snapshot the board is built from, in the same program run, so they are deterministic: run the program twice and the numbers come out identical.</p>
+</section>
+
 <footer class="foot"><span id="foot-line"></span></footer>
 </div>
 <script src="../data.js"></script>

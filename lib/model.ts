@@ -170,6 +170,25 @@ export interface LiveRow {
   change_7d: number | null;
 }
 
+/** One perturbation of the snapshot's figures, and how much of the board's top it kept. */
+export interface StabilityRow {
+  tvl_factor: number;
+  growth_shift_pp: number;
+  top20_overlap: number;
+  top10_overlap: number;
+  rank_spearman: number;
+  top1_same: boolean;
+}
+
+/** The board's own checks: every row's arithmetic recomputed, and the board's order under perturbed figures. */
+export interface BoardChecks {
+  recompute_exact: number;
+  recompute_total: number;
+  perturbations: StabilityRow[];
+  worst_top20_overlap: number;
+  worst_rank_spearman: number;
+}
+
 /** Everything the dashboard renders. */
 export interface RadarData {
   as_of: string;
@@ -183,6 +202,7 @@ export interface RadarData {
   board_size: number;
   early_size: number;
   live_size: number;
+  checks: BoardChecks;
   rows: RadarRow[];
   live: LiveRow[];
 }
@@ -612,6 +632,101 @@ export function radarRow(row: BoardRow): RadarRow {
   };
 }
 
+/** The Spearman rank correlation of two same-length number lists. */
+function spearman(xs: number[], ys: number[]): number {
+  const rankOf = (values: number[]): number[] => {
+    const order = values.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]);
+    const ranks = new Array<number>(values.length);
+    let i = 0;
+    while (i < order.length) {
+      let j = i;
+      while (j + 1 < order.length && order[j + 1]![0] === order[i]![0]) j++;
+      const avg = (i + j) / 2 + 1;
+      for (let k = i; k <= j; k++) ranks[order[k]![1]] = avg;
+      i = j + 1;
+    }
+    return ranks;
+  };
+  const rx = rankOf(xs);
+  const ry = rankOf(ys);
+  const n = xs.length;
+  const mx = rx.reduce((a, b) => a + b, 0) / n;
+  const my = ry.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let dx = 0;
+  let dy = 0;
+  for (let i = 0; i < n; i++) {
+    num += (rx[i]! - mx) * (ry[i]! - my);
+    dx += (rx[i]! - mx) ** 2;
+    dy += (ry[i]! - my) ** 2;
+  }
+  return dx === 0 || dy === 0 ? 0 : num / Math.sqrt(dx * dy);
+}
+
+/**
+ * The board's own checks, computed from the snapshot's figures at build time.
+ * First, every row's implied value recomputed from the multipliers the row
+ * stores — the same arithmetic the dashboard page runs live. Second, the
+ * board rebuilt four times with every protocol's TVL moved 10% up or down and
+ * its 7-day change moved 5 points either way, to show the board's order is
+ * not an artifact of small moves in any one figure: how many of the top 20
+ * (and top 10) survive each perturbation, how the full ranking correlates,
+ * and whether the top row stays the top row. A robustness check, not an
+ * accuracy claim: the snapshot is one frozen point in time, so no backtest
+ * against later market caps can be run from it, and none is claimed here.
+ */
+export function boardChecks(snapshot: Snapshot, board: BoardRow[]): BoardChecks {
+  let exact = 0;
+  for (const r of board) {
+    const m = r.model;
+    const recomputed = Math.max(
+      1,
+      Math.round(r.tvl_usd * m.category_multiple * m.growth_multiplier * m.maturity_multiplier * m.chain_multiplier),
+    );
+    if (recomputed === r.implied_value_usd) exact++;
+  }
+  const base = board.map((r) => r.slug);
+  const combos: Array<[number, number]> = [
+    [1.1, 5],
+    [0.9, -5],
+    [1.1, -5],
+    [0.9, 5],
+  ];
+  const perturbations: StabilityRow[] = combos.map(([tvlFactor, growthShift]) => {
+    const perturbed: Snapshot = {
+      ...snapshot,
+      protocols: snapshot.protocols.map((p) => ({
+        ...p,
+        tvl_usd: Math.round(p.tvl_usd * tvlFactor),
+        change_7d: p.change_7d === null ? null : p.change_7d + growthShift,
+      })),
+    };
+    const rebuilt = buildBoard(perturbed).map((r) => r.slug);
+    const top20 = new Set(rebuilt.slice(0, 20));
+    const top10 = new Set(rebuilt.slice(0, 10));
+    const position = new Map(rebuilt.map((slug, i) => [slug, i + 1] as const));
+    const sp = spearman(
+      base.map((_slug, i) => i + 1),
+      base.map((slug) => position.get(slug) ?? 0),
+    );
+    return {
+      tvl_factor: tvlFactor,
+      growth_shift_pp: growthShift,
+      top20_overlap: base.slice(0, 20).filter((slug) => top20.has(slug)).length,
+      top10_overlap: base.slice(0, 10).filter((slug) => top10.has(slug)).length,
+      rank_spearman: Math.round(sp * 1e4) / 1e4,
+      top1_same: rebuilt[0] === base[0],
+    };
+  });
+  return {
+    recompute_exact: exact,
+    recompute_total: board.length,
+    perturbations,
+    worst_top20_overlap: Math.min(...perturbations.map((p) => p.top20_overlap)),
+    worst_rank_spearman: Math.min(...perturbations.map((p) => p.rank_spearman)),
+  };
+}
+
 /** Everything the dashboard renders, from the snapshot. */
 export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): { board: BoardRow[]; radar: RadarData } {
   const board = buildBoard(snapshot, model);
@@ -630,6 +745,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     board_size: board.length,
     early_size: early,
     live_size: live.length,
+    checks: boardChecks(snapshot, board),
     rows: board.map(radarRow),
     live,
   };
