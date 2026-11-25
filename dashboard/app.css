@@ -93,25 +93,39 @@ tbody tr.rank1:hover { background: rgba(245, 165, 36, 0.2); }
 .button { min-height: 38px; padding: 0 var(--s4); border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
 .button.primary { background: var(--amber); border-color: var(--amber); color: #1a1200; font-weight: 650; }
 .button[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #1a1200; font-weight: 650; }
-.detail { padding: var(--s5); display: grid; gap: var(--s5); }
+.detail { padding: var(--s5); display: grid; gap: var(--s4); }
 .detail-head { display: flex; align-items: start; justify-content: space-between; gap: var(--s4); }
 .detail-head h2 { font-size: 26px; margin-top: var(--s1); }
 .detail-head .sub { margin-top: var(--s1); }
-.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
-.detail-box { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); display: grid; gap: var(--s3); }
+.detail-head .button { white-space: nowrap; flex: none; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s4); align-items: start; }
+.detail-col { display: grid; gap: var(--s4); align-content: start; }
+.detail-box { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); display: grid; gap: var(--s3); align-content: start; }
 .detail-box h3 { margin-bottom: var(--s1); }
-.equation { display: grid; gap: var(--s2); font-size: 14px; }
+.equation { display: grid; gap: 6px; font-size: 14px; }
 .equation div { display: flex; justify-content: space-between; gap: var(--s3); }
 .equation span { color: var(--muted); }
 .equation b { font-family: var(--font-num); font-weight: 600; text-align: right; }
 .equation .total { border-top: 1px solid var(--border); padding-top: var(--s2); }
 .equation .total b { color: var(--amber-soft); font-size: 16px; }
-.steps { margin: 0; padding-left: 22px; display: grid; gap: var(--s3); font-size: 14px; }
+.steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 14px; }
 .steps li { padding-left: var(--s1); }
 .steps b { display: block; font-weight: 500; }
 .cost { color: var(--muted); font-size: 12px; font-family: var(--font-num); }
+/* Farm-plan lead: verdict badge + the protocol-specific action + the costed
+   rollup, so the detail view opens on what to do and what it costs. */
+.farm-lead { display: flex; gap: var(--s3); align-items: start; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: var(--s3); }
+.verdict { flex: none; font-family: var(--font-num); font-weight: 700; font-size: 13px; letter-spacing: 0.08em; padding: 3px 9px; border-radius: 6px; margin-top: 1px; }
+.verdict.farm { background: rgba(62, 207, 142, 0.16); color: var(--green); }
+.verdict.thin { background: var(--amber-dim); color: var(--amber-soft); }
+.verdict.skip { background: rgba(255, 107, 107, 0.16); color: var(--red); }
+.farm-lead-text { display: grid; gap: 2px; min-width: 0; }
+.farm-lead-text b { font-weight: 600; font-size: 14px; }
+.farm-lead-text .econ { color: var(--muted); font-size: 12px; font-family: var(--font-num); overflow-wrap: anywhere; }
+.farm-lead-text .rule { color: var(--faint); font-size: 12px; }
 .foot { color: var(--faint); font-size: 12px; padding: var(--s5) 0 var(--s2); border-top: 1px solid var(--border); margin-top: var(--s5); }
 body.detail-mode #method { display: none; }
+body.detail-mode .lede { display: none; }
 @media (max-width: 900px) {
   .shell { padding: var(--s4); }
   .lede { grid-template-columns: 1fr; gap: var(--s4); }

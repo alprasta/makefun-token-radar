@@ -157,6 +157,7 @@ export interface RadarRow {
   maturity_multiplier: number;
   chain_multiplier: number;
   farm_steps: string[];
+  farm_econ: FarmEcon;
 }
 
 /** A live-token protocol: the market's own value, never a model number. */
@@ -406,10 +407,10 @@ function chainOf(p: SnapshotProtocol): string {
 }
 
 /** How much capital one farm position needs, from the protocol's own TVL. */
-function capitalFor(p: SnapshotProtocol): number {
-  if (p.tvl_usd >= 5_000_000_000) return 250;
-  if (p.tvl_usd >= 1_000_000_000) return 150;
-  if (p.tvl_usd >= 100_000_000) return 100;
+function capitalFor(tvlUsd: number): number {
+  if (tvlUsd >= 5_000_000_000) return 250;
+  if (tvlUsd >= 1_000_000_000) return 150;
+  if (tvlUsd >= 100_000_000) return 100;
   return 50;
 }
 
@@ -419,6 +420,71 @@ function holdDaysFor(age: number | null): number {
   if (age < 180) return 60;
   if (age < 365) return 45;
   return 30;
+}
+
+/**
+ * The farm plan's own cost and time constants: the six step strings and the
+ * economics rollup below are both built from these, so they cannot drift
+ * apart. Gas is the plan's own figures — under $3 for the first transaction,
+ * about $8 ($4 on a small deposit) to set the position up, about $2 a week
+ * to keep it warm — and the minutes are the steps' own times added up.
+ */
+const GAS_FIRST_USD = 3;
+const GAS_SETUP_HIGH_USD = 8;
+const GAS_SETUP_LOW_USD = 4;
+const GAS_WEEKLY_USD = 2;
+const WALLET_MIN = 5;
+const SETUP_MIN = 15;
+const WEEKLY_MIN = 10;
+const CLAIM_MIN = 10;
+const LOG_MIN = 5;
+/** Verdict thresholds: total gas over the hold, as a share of the deposit. */
+const VERDICT_FARM_MAX = 0.2;
+const VERDICT_THIN_MAX = 0.4;
+
+/**
+ * A row's farm economics, from the same figures the six steps are built on:
+ * the deposit the plan sizes, the gas the plan's own steps add up to over the
+ * hold, the minutes it takes, and the verdict those costs give. The verdict
+ * is cost-only — gas over the hold as a share of the deposit — because the
+ * snapshot carries no airdrop size to net against; the rule is stated on the
+ * dashboard wherever the verdict is shown, so a reader can check it.
+ */
+export interface FarmEcon {
+  capital_usd: number;
+  gas_first_usd: number;
+  gas_setup_usd: number;
+  gas_weekly_usd: number;
+  hold_weeks: number;
+  gas_total_usd: number;
+  setup_min: number;
+  weekly_min: number;
+  hold_days: number;
+  gas_share: number;
+  verdict: 'FARM' | 'THIN' | 'SKIP';
+}
+
+export function farmEconFor(tvlUsd: number, age: number | null): FarmEcon {
+  const capital = capitalFor(tvlUsd);
+  const hold = holdDaysFor(age);
+  const gasSetup = capital >= 150 ? GAS_SETUP_HIGH_USD : GAS_SETUP_LOW_USD;
+  const holdWeeks = Math.ceil(hold / 7);
+  const gasTotal = GAS_FIRST_USD + gasSetup + GAS_WEEKLY_USD * holdWeeks;
+  const gasShare = round4(gasTotal / capital);
+  const verdict = gasShare <= VERDICT_FARM_MAX ? 'FARM' : gasShare <= VERDICT_THIN_MAX ? 'THIN' : 'SKIP';
+  return {
+    capital_usd: capital,
+    gas_first_usd: GAS_FIRST_USD,
+    gas_setup_usd: gasSetup,
+    gas_weekly_usd: GAS_WEEKLY_USD,
+    hold_weeks: holdWeeks,
+    gas_total_usd: gasTotal,
+    setup_min: WALLET_MIN + SETUP_MIN + CLAIM_MIN + LOG_MIN,
+    weekly_min: WEEKLY_MIN,
+    hold_days: hold,
+    gas_share: gasShare,
+    verdict,
+  };
 }
 
 /** The category's one action, in words a farmer can follow. No name is special-cased. */
@@ -549,8 +615,9 @@ function logNounFor(p: SnapshotProtocol): string {
 export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
   const chain = chainOf(p);
   const gas = gasTokenFor(chain);
-  const capital = capitalFor(p);
-  const hold = holdDaysFor(age);
+  const econ = farmEconFor(p.tvl_usd, age);
+  const capital = econ.capital_usd;
+  const hold = econ.hold_days;
   const action = actionFor(p, capital, chain);
   const ageText = age === null ? 'an unknown age' : age < 365 ? `${age} days` : `${(age / 365).toFixed(1)} years`;
   const tvlText = p.tvl_usd >= 1e9 ? `$${(p.tvl_usd / 1e9).toFixed(2)}B` : `$${Math.round(p.tvl_usd / 1e6)}M`;
@@ -559,18 +626,18 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
   return [
     {
       text: `Use a fresh wallet on ${chain} that holds only the funds you plan to farm, and keep a little ${gas} aside for gas. Keep its seed phrase offline.`,
-      cost: 'under $3 of gas for the first transaction',
-      time: '5 minutes',
+      cost: `under $${econ.gas_first_usd} of gas for the first transaction`,
+      time: `${WALLET_MIN} minutes`,
     },
     {
       text: action,
-      cost: `$${capital} of capital and about $${capital >= 150 ? 8 : 4} of gas`,
-      time: '15 minutes to set up',
+      cost: `$${capital} of capital and about $${econ.gas_setup_usd} of gas`,
+      time: `${SETUP_MIN} minutes to set up`,
     },
     {
       text: weeklyActionFor(p, capital),
-      cost: 'about $2 of gas a week',
-      time: '10 minutes a week',
+      cost: `about $${econ.gas_weekly_usd} of gas a week`,
+      time: `${WEEKLY_MIN} minutes a week`,
     },
     {
       text: `Hold the position for at least ${hold} days — ${p.name} has run ${ageText} with no token, so a position held across ${hold} days is counted in more than one snapshot. At ${tvlText} TVL, $${capital} is small enough to exit without moving the pool.`,
@@ -580,12 +647,12 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
     {
       text: `Before you withdraw, ${claimLower}`,
       cost: 'no fee to check, and never pay to claim',
-      time: '10 minutes',
+      time: `${CLAIM_MIN} minutes`,
     },
     {
       text: `Write the wallet, the dates, ${logNounFor(p)} and every transaction hash in a farm log so you can repeat the position or unwind it.`,
       cost: 'nothing but the log',
-      time: '5 minutes',
+      time: `${LOG_MIN} minutes`,
     },
   ];
 }
@@ -629,6 +696,7 @@ export function radarRow(row: BoardRow): RadarRow {
     maturity_multiplier: row.model.maturity_multiplier,
     chain_multiplier: row.model.chain_multiplier,
     farm_steps: row.farm_steps,
+    farm_econ: farmEconFor(row.tvl_usd, row.age_days),
   };
 }
 

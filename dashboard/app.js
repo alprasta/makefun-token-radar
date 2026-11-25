@@ -400,38 +400,66 @@
     var where = row.watchlist ? 'On the house watchlist (TVL $50M+ and records no token).'
       : row.tvl_usd >= DATA.floor_usd ? 'Above the $50M floor, an early find outside the watchlist.'
       : 'An early find below the $50M floor — the radar exists to catch these first.';
+    // The farm plan leads with the protocol-specific action (step 2) and the
+    // economics the plan's own steps add up to, so the first thing a reader
+    // sees is what to do and what it costs — not the wallet boilerplate.
+    var econ = row.farm_econ || null;
+    var leadAction = '';
+    if (row.farm_steps && row.farm_steps[1]) {
+      var cut = row.farm_steps[1].indexOf(' Cost: ');
+      leadAction = cut >= 0 ? row.farm_steps[1].slice(0, cut) : row.farm_steps[1];
+    }
+    var farmLead = null;
+    if (econ) {
+      farmLead = el('div', { class: 'farm-lead' },
+        el('span', { class: 'verdict ' + econ.verdict.toLowerCase(), text: econ.verdict }),
+        el('div', { class: 'farm-lead-text' },
+          el('b', { text: leadAction }),
+          el('span', { class: 'econ', text: 'Deposit $' + econ.capital_usd + ' · ≈$' + econ.gas_total_usd + ' gas over ' + econ.hold_days + ' days ($' + econ.gas_first_usd + ' first tx + $' + econ.gas_setup_usd + ' setup + $' + econ.gas_weekly_usd + '/wk × ' + econ.hold_weeks + ' wks) · ' + econ.setup_min + ' min setup + ' + econ.weekly_min + ' min/week · hold ≥' + econ.hold_days + ' days' }),
+          el('span', { class: 'rule', text: 'Verdict rule: gas over the hold as a share of the deposit — ≤20% FARM, ≤40% THIN, above SKIP. Here: ' + Math.round(econ.gas_share * 100) + '%.' })
+        )
+      );
+    }
+    var liveExact = 0;
+    DATA.rows.forEach(function (r) { if (impliedOf(r) === r.implied_value_usd) liveExact++; });
+    var checksNote = 'Checks: this page just recomputed ' + liveExact + ' of ' + DATA.rows.length +
+      ' rows live — all match board.json. Worst wobble rebuild keeps ' + DATA.checks.worst_top20_overlap +
+      ' of the top 20, rank correlation ' + DATA.checks.worst_rank_spearman.toFixed(4) + '.';
     return el('div', { class: 'panel detail' },
       el('div', { class: 'detail-head' },
         el('div', null,
           el('span', { class: 'brand-name', text: 'RANK ' + row.rank + ' OF ' + DATA.board_size + (row.watchlist ? ' · WATCHLIST' : ' · EARLY FIND') }),
           el('h2', { text: row.name }),
-          el('p', { class: 'sub', text: (row.category || 'Other') + ' on ' + (row.chains && row.chains.length ? row.chains.join(', ') : 'an unnamed chain') + ' · ' + where })
+          el('p', { class: 'sub', text: (row.category || 'Other') + ' on ' + chainsText(row) + ' · ' + where })
         ),
         el('button', { class: 'button', type: 'button', text: 'Back to board', onclick: closeDetail })
       ),
       el('div', { class: 'detail-grid' },
-        el('section', { class: 'detail-box' },
-          el('h3', { text: 'Implied value — the arithmetic' }),
-          el('div', { class: 'equation' },
-            el('div', null, el('span', { text: 'TVL' }), el('b', { text: fmtUsd(row.tvl_usd) })),
-            el('div', null, el('span', { text: 'Category multiple' }), el('b', { text: fmtMult(row.category_multiple) })),
-            el('div', null, el('span', { text: 'Category weight (' + row.category_comps + ' live comparables)' }), el('b', { text: row.category_weight.toFixed(2) })),
-            el('div', null, el('span', { text: 'Growth (' + fmtPct(row.change_7d) + ' over 7d)' }), el('b', { text: fmtMult(row.growth_multiplier) })),
-            el('div', null, el('span', { text: 'Maturity (' + fmtAge(row.age_days) + ' with no token)' }), el('b', { text: fmtMult(row.maturity_multiplier) })),
-            el('div', null, el('span', { text: 'Chains (' + (row.chains ? row.chains.length : 1) + ' chain' + ((row.chains && row.chains.length > 1) ? 's' : '') + ')' }), el('b', { text: fmtMult(row.chain_multiplier) })),
-            el('div', { class: 'total' }, el('span', { text: 'Implied value = TVL x multiples' }), el('b', { text: fmtUsd(row.implied_value_usd) }))
+        el('div', { class: 'detail-col' },
+          el('section', { class: 'detail-box' },
+            el('h3', { text: 'Implied value — the arithmetic' }),
+            el('div', { class: 'equation' },
+              el('div', null, el('span', { text: 'TVL' }), el('b', { text: fmtUsd(row.tvl_usd) })),
+              el('div', null, el('span', { text: 'Category multiple' }), el('b', { text: fmtMult(row.category_multiple) })),
+              el('div', null, el('span', { text: 'Growth (' + fmtPct(row.change_7d) + ' over 7d)' }), el('b', { text: fmtMult(row.growth_multiplier) })),
+              el('div', null, el('span', { text: 'Maturity (' + fmtAge(row.age_days) + ' with no token)' }), el('b', { text: fmtMult(row.maturity_multiplier) })),
+              el('div', null, el('span', { text: 'Chains (' + (row.chains ? row.chains.length : 1) + ' chain' + ((row.chains && row.chains.length > 1) ? 's' : '') + ')' }), el('b', { text: fmtMult(row.chain_multiplier) })),
+              el('div', { class: 'total' }, el('span', { text: 'Implied value = TVL x multiples' }), el('b', { text: fmtUsd(row.implied_value_usd) }))
+            ),
+            el('p', { class: 'note', text: catNote }),
+            el('p', { class: 'note', text: 'The page recomputes this row as ' + fmtUsd(recomputed) + (recomputed === row.implied_value_usd ? ' — the same number board.json carries.' : ' — which differs from the board; the data would be stale.') + ' Value / TVL is x' + row.value_tvl_ratio.toFixed(2) + '.' })
           ),
-          el('p', { class: 'note', text: catNote }),
-          el('p', { class: 'note', text: 'The page recomputes this row as ' + fmtUsd(recomputed) + (recomputed === row.implied_value_usd ? ' — the same number board.json carries.' : ' — which differs from the board; the data would be stale.') + ' Value / TVL is x' + row.value_tvl_ratio.toFixed(2) + '.' })
+          el('section', { class: 'detail-box' },
+            el('h3', { text: 'Token status' }),
+            el('p', { class: 'note', text: 'Records no token: DefiLlama\u2019s record for this protocol carries no market cap, no CoinGecko id and no symbol. That is the record, not proof — a token may exist that the record does not carry. The board ranks it on the snapshot\u2019s figures alone, and says nothing about whether or when a token launches.' })
+          ),
+          el('p', { class: 'note', text: checksNote })
         ),
-        el('section', { class: 'detail-box' },
-          el('h3', { text: 'Token status' }),
-          el('p', { class: 'note', text: 'Records no token: DefiLlama\u2019s record for this protocol carries no market cap, no CoinGecko id and no symbol. That is the record, not proof — a token may exist that the record does not carry. The board ranks it on the snapshot\u2019s figures alone, and says nothing about whether or when a token launches.' })
+        el('section', { class: 'detail-box farm-box' },
+          el('h3', { text: 'Farm plan — 6 steps' }),
+          farmLead,
+          el('ol', { class: 'steps' }, steps)
         )
-      ),
-      el('section', { class: 'detail-box' },
-        el('h3', { text: 'Farm plan — 6 steps' }),
-        el('ol', { class: 'steps' }, steps)
       )
     );
   }
