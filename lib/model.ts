@@ -190,6 +190,23 @@ export interface BoardChecks {
   worst_rank_spearman: number;
 }
 
+/** How every protocol in the snapshot is accounted for: the ranked board, the
+ * pre-token protocols the ranking rules set aside (by the first rule each
+ * fails), and the protocols that already carry a token in the record. The
+ * three groups sum to the snapshot's protocol count, so a reader can check
+ * that no protocol in the snapshot is missing from the board's story. */
+export interface SnapshotCounts {
+  total: number;
+  pre_token: number;
+  ranked: number;
+  excluded_category: number;
+  excluded_versioned: number;
+  excluded_wrapped: number;
+  excluded_exchange: number;
+  with_token: number;
+  live_shown: number;
+}
+
 /** Everything the dashboard renders. */
 export interface RadarData {
   as_of: string;
@@ -203,6 +220,7 @@ export interface RadarData {
   board_size: number;
   early_size: number;
   live_size: number;
+  snapshot_counts: SnapshotCounts;
   checks: BoardChecks;
   rows: RadarRow[];
   live: LiveRow[];
@@ -344,6 +362,40 @@ export function isRankable(p: SnapshotProtocol): boolean {
   if (WRAPPED_WORD.test(p.name)) return false;
   if (EXCHANGE_PREFIXES.some((prefix) => p.name.startsWith(prefix))) return false;
   return true;
+}
+
+/**
+ * Every protocol in the snapshot, accounted for: the ranked board, the
+ * pre-token protocols the ranking rules set aside, and the protocols that
+ * already carry a token. The set-aside counts follow the same rule order as
+ * isRankable, so each protocol is counted by the first rule it fails and the
+ * groups sum exactly to the snapshot's protocol count.
+ */
+export function snapshotCounts(snapshot: Snapshot, liveShown: number): SnapshotCounts {
+  const counts: SnapshotCounts = {
+    total: snapshot.protocols.length,
+    pre_token: 0,
+    ranked: 0,
+    excluded_category: 0,
+    excluded_versioned: 0,
+    excluded_wrapped: 0,
+    excluded_exchange: 0,
+    with_token: 0,
+    live_shown: liveShown,
+  };
+  for (const p of snapshot.protocols) {
+    if (!isPreToken(p)) {
+      counts.with_token++;
+      continue;
+    }
+    counts.pre_token++;
+    if (p.category !== null && EXCLUDED_CATEGORIES.has(p.category)) counts.excluded_category++;
+    else if (VERSIONED.test(p.name)) counts.excluded_versioned++;
+    else if (WRAPPED_WORD.test(p.name)) counts.excluded_wrapped++;
+    else if (EXCHANGE_PREFIXES.some((prefix) => p.name.startsWith(prefix))) counts.excluded_exchange++;
+    else counts.ranked++;
+  }
+  return counts;
 }
 
 /** The protocols the board ranks, strongest first, with ranks 1..n. */
@@ -813,6 +865,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     board_size: board.length,
     early_size: early,
     live_size: live.length,
+    snapshot_counts: snapshotCounts(snapshot, live.length),
     checks: boardChecks(snapshot, board),
     rows: board.map(radarRow),
     live,
