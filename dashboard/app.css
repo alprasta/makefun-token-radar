@@ -119,6 +119,10 @@ tbody tr.rank1:hover { background: rgba(245, 165, 36, 0.2); }
 .verdict.farm { background: rgba(62, 207, 142, 0.16); color: var(--green); }
 .verdict.thin { background: var(--amber-dim); color: var(--amber-soft); }
 .verdict.skip { background: rgba(255, 107, 107, 0.16); color: var(--red); }
+/* Farm verdict on the board table: badge + gas share on one line. */
+.verdict-cell { white-space: nowrap; }
+.verdict-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.verdict-share { font-family: var(--font-num); font-size: 12px; color: var(--muted); }
 .farm-lead-text { display: grid; gap: 2px; min-width: 0; }
 .farm-lead-text b { font-weight: 600; font-size: 14px; }
 .farm-lead-text .econ { color: var(--muted); font-size: 12px; font-family: var(--font-num); overflow-wrap: anywhere; }

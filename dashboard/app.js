@@ -123,6 +123,15 @@
       ['Live-token comparables priced', String(DATA.live_comps)],
       ['Live-token protocols shown', String(DATA.live_size)],
     ];
+    // Every protocol in the snapshot, accounted for in one line: the ranked
+    // board, the pre-token protocols the ranking rules set aside, and the
+    // protocols that already carry a token. The three groups sum to the
+    // snapshot's protocol count, so nothing in the snapshot is unaccounted for.
+    if (DATA.snapshot_counts) {
+      var c = DATA.snapshot_counts;
+      items.push(['Snapshot accounted for',
+        c.total + ' · ' + c.ranked + ' ranked · ' + (c.excluded_category + c.excluded_versioned + c.excluded_wrapped + c.excluded_exchange) + ' set aside · ' + c.with_token + ' tokens']);
+    }
     items.forEach(function (it) {
       facts.appendChild(el('div', { class: 'fact' }, el('span', { text: it[0] }), el('b', { text: it[1] })));
     });
@@ -319,14 +328,14 @@
           el('span', { class: 'num', text: fmtUsd(r.implied_value_usd) })
         )),
         el('td', { class: 'num', text: 'x' + r.value_tvl_ratio.toFixed(2) }),
-        el('td', null, el('span', { class: 'status', text: 'records no token' }))
+        el('td', { class: 'verdict-cell' }, farmVerdictCell(r))
       );
       tbody.appendChild(tr);
     });
     return el('div', { class: 'panel' },
       el('div', { class: 'table-wrap' },
         el('table', null,
-          el('caption', { text: 'Pre-token protocols, strongest implied value first. Select a row for its value arithmetic and farm plan.' }),
+          el('caption', { text: 'Pre-token protocols, strongest implied value first. Farm verdict is gas over the hold as a share of the deposit — \u226420% FARM, \u226440% THIN, above SKIP.' }),
           el('thead', null, el('tr', null,
             sortHeader('rank', 'Rank'),
             el('th', { scope: 'col', text: 'Protocol' }),
@@ -335,11 +344,24 @@
             sortHeader('age', 'Age'),
             sortHeader('implied', 'Implied value'),
             el('th', { scope: 'col', text: 'Value / TVL' }),
-            el('th', { scope: 'col', text: 'Token' })
+            el('th', { scope: 'col', text: 'Farm verdict' })
           )),
           tbody
         )
       )
+    );
+  }
+
+  // One row's farm verdict, from the economics its own plan adds up to: the
+  // badge plus the gas share of the deposit, so the board shows at a glance
+  // which rows are worth farming and which are not. Falls back to the token
+  // status when a row carries no farm economics.
+  function farmVerdictCell(r) {
+    var econ = r.farm_econ || null;
+    if (!econ) return el('span', { class: 'status', text: 'records no token' });
+    return el('span', { class: 'verdict-wrap' },
+      el('span', { class: 'verdict ' + econ.verdict.toLowerCase(), text: econ.verdict }),
+      el('span', { class: 'verdict-share', text: Math.round(econ.gas_share * 100) + '% gas' })
     );
   }
 
